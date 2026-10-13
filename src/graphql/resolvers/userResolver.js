@@ -1,4 +1,6 @@
 const User = require("../../models/User");
+const bcrypt = require("bcrypt");
+const jwt = require('jsonwebtoken');
 
 
 const userResolver = {
@@ -31,11 +33,48 @@ const userResolver = {
 
             return await User.findByIdAndUpdate(id, update, { new: true });
         },
-        deleteUser: async (_, { id}) => {
+        deleteUser: async (_, { id }) => {
             const res = await User.findByIdAndDelete(id);
             return !!res;
         },
+        registerUser: async (_, { name, email, password }) => {
+            const existUser = await User.findOne({ email: email });
+            if (existUser) throw new Error("Email already registered");
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            const newUser = new User({ name, email, password: hashedPassword });
+            await newUser.save();
+
+            var token = jwt.sign({ userId: newUser.id }, process.env.JWT_SECRET, {
+                expiresIn: "1d"
+            });
+
+            return {
+                token,
+                user: newUser,
+            };
+        },
+        loginUser: async (_, { email, password }) => {
+            const existUser = await User.findOne({ email: email });
+            if (!existUser) throw new Error("User not found.");
+
+            const isMatchedPassword = await bcrypt.compare(password, existUser.password);
+
+            if(!isMatchedPassword){
+                throw new Error("Invalid credentails");
+            }
+
+            var token = jwt.sign({ userId: existUser.id }, process.env.JWT_SECRET, {
+                expiresIn: "1d"
+            });
+
+            return {
+                token,
+                user: existUser,
+            };
+        },
     }
-} 
+}
 
 module.exports = userResolver;
