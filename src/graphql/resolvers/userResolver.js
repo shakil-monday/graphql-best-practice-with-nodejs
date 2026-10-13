@@ -5,10 +5,14 @@ const jwt = require('jsonwebtoken');
 
 const userResolver = {
     Query: {
-        users: async () => {
+        users: async (_, __, { user }) => {
+            console.log(user)
+            if (!user) throw new Error("Unauthorized");
             return await User.find().sort({ createdAt: -1 });
         },
-        user: async (_, { id }) => {
+        user: async (_, { id }, { user }) => {
+            console.log(user)
+            if (!user) throw new Error("Unauthorized");
             return await User.findById(id);
         }
     },
@@ -20,7 +24,7 @@ const userResolver = {
             const user = new User({ name, email });
             return await user.save();
         },
-        updateUser: async (_, { id, name, email }) => {
+        updateUser: async (_, { id, name, email }, { user }) => {
             const update = {};
 
             if (name !== undefined) update.name = name;
@@ -61,7 +65,7 @@ const userResolver = {
 
             const isMatchedPassword = await bcrypt.compare(password, existUser.password);
 
-            if(!isMatchedPassword){
+            if (!isMatchedPassword) {
                 throw new Error("Invalid credentails");
             }
 
