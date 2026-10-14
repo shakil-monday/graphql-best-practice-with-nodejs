@@ -1,6 +1,12 @@
 require("dotenv").config();
-const createApp = require("./app");
+const { createServer } = require("http");
+const { execute, subscribe } = require("graphql");
+const { SubscriptionServer } = require("subscriptions-transport-ws");
+
+const { createApp, createApolloServer } = require("./app");
 const connectDB = require("./config/db");
+const { typeDefs, resolvers } = require("./graphql/schema");
+const { makeExecutableSchema } = require("@graphql-tools/schema");
 
 const PORT = process.env.PORT || 5001;
 
@@ -8,7 +14,35 @@ const PORT = process.env.PORT || 5001;
     await connectDB();
     const app = await createApp();
 
-    app.listen(PORT, ()=>{
+    const httpServer = createServer(app);
+
+    const apolloServer = await createApolloServer(app);
+
+    const schema = makeExecutableSchema({
+        typeDefs,
+        resolvers,
+    });
+
+    SubscriptionServer.create(
+        {
+            schema,
+            execute,
+            subscribe,
+            onConnect: () => {
+                console.log("Client connected for Subscriptions");
+            },
+            onDisconnect: () => {
+                console.log("Client disconnected form Subscriptions");
+            }
+        },
+        {
+            server: httpServer,
+            path: "/graphql",
+        }
+    );
+
+
+    httpServer.listen(PORT, () => {
         console.log(`Server ready at http://localhost:${PORT}/graphql`);
     });
 })();
